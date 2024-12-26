@@ -73,9 +73,10 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
 
         self.xy_feature_reading_frequency = 50  # frequency of XY feature readings
         self.xy_max_range = 50  # maximum XY range, used to simulate the field of view
+        self.range_covariance = 0.25**2  # covariance of simulated range noise
 
-        self.yaw_reading_frequency = 10  # frequency of Yasw readings
-        self.v_yaw_std = np.deg2rad(5)  # std deviation of simulated heading noise
+        self.yaw_reading_frequency = 5 # frequency of Yasw readings
+        self.v_yaw_std = np.deg2rad(1)  # std deviation of simulated heading noise
 
     def fs(self, xsk_1, usk):  # input velocity motion model with velocity noise
         """ Motion model used to simulate the robot motion. Computes the current robot state :math:`x_k` given the previous robot state :math:`x_{k-1}` and the input :math:`u_k`:
@@ -108,8 +109,44 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         """
 
         # TODO: to be completed by the student
+        # if self.k % self.xy_feature_reading_frequency != 0:
+        #     # Provide readings at the predefined frequency
+        #     return []
+        # Extract the previous position (x, y, yaw) and the previous velocities (u, v, r)
+        previous_position = xsk_1[0:3]  
+        previous_velocity = xsk_1[3:6]  
 
-        pass
+        desired_forward_velocity = usk[0, 0]  
+        desired_angular_velocity = usk[1, 0]
+
+        # Generate motion noise based on the defined covariance matrix using multivariate Gaussian distribution 
+        motion_noise = np.random.multivariate_normal(mean=np.zeros(3), cov=self.Qsk).reshape((3, 1)) 
+        
+        # Time step for the simulation (dt)
+        dt =self.dt
+        # Define the gain matrix K for controlling velocity adjustments
+        K = np.diag([1, 1, 1])
+        # Construct the desired velocity vector for the robot
+        # Note: For a differential drive, linear velocity in the y-direction (v) is typically zero
+        desired_velocity = np.array([[desired_forward_velocity], [0], [desired_angular_velocity]])  # Desired velocity (v is always 0 for differential drive)
+        new_velocity = previous_velocity + K @ (desired_velocity - previous_velocity) + motion_noise * dt
+
+        #position chnage
+        position_change = previous_velocity * dt + 0.5 * motion_noise * dt**2
+        
+        # Update the robot's position using pose compounding
+        new_position = Pose3D(previous_position).oplus(Pose3D(position_change))
+        self.xsk = np.vstack((new_position, new_velocity))
+
+        if self.k % self.visualizationInterval == 0:
+                self.PlotRobot()
+                self.xTraj.append(self.xsk[0, 0])
+                self.yTraj.append(self.xsk[1, 0])
+                self.trajectory.pop(0).remove()
+                self.trajectory = plt.plot(self.xTraj, self.yTraj, marker='.', color='orange', markersize=1)
+
+        self.k += 1
+        return self.xsk
 
     def ReadEncoders(self):
         """ Simulates the robot measurements of the left and right wheel encoders.
@@ -120,8 +157,27 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         """
 
         # TODO: to be completed by the student
+        if self.k % self.encoder_reading_frequency != 0:
+            # Provide readings at the predefined frequency
+            return [], []
+        linear_velocity = self.xsk[3, 0]  # Linear velocity in the B-Frame (forward direction)
+        angular_velocity = self.xsk[5, 0]  # Angular velocity in the B-Frame (around the z-axis)
 
-        pass
+        # Calculate the velocities of the left and right wheels using the differential drive kinematics
+        left_wheel_velocity = linear_velocity - (self.wheelBase / 2) * angular_velocity  
+        right_wheel_velocity = linear_velocity + (self.wheelBase / 2) * angular_velocity  
+        
+        # Convert wheel velocities to encoder pulses for the time duration dt
+        left_wheel_pulses = (left_wheel_velocity * self.dt) / (2 * np.pi * self.wheelRadius) * self.pulse_x_wheelTurns  
+        right_wheel_pulses = (right_wheel_velocity * self.dt) / (2 * np.pi * self.wheelRadius) * self.pulse_x_wheelTurns  
+
+        # Create the observation vector zsk containing the number of pulses for both wheels    
+        zsk = np.array([left_wheel_pulses, right_wheel_pulses])  # Encoder pulses
+
+        # Simulate encoder noise using multivariate Gaussian distribution based on the covariance matrix
+        encoder_noise = np.random.multivariate_normal(mean=np.zeros(2), cov=self.Re)  # Reshape to (2, 1) # Noise covariance for encoder readings
+        zsk += encoder_noise
+        return zsk, self.Re
 
     def ReadCompass(self):
         """ Simulates the compass reading of the robot.
@@ -130,8 +186,74 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         """
 
         # TODO: to be completed by the student
+        # Extract the current yaw (orientation) from the robot's state
 
-        pass
+        yaw = self.xsk[2, 0]  
+
+        # Define the covariance matrix for multivariate Gaussian noise
+        R_yaw = np.array([[self.v_yaw_std**2]])  # Covariance matrix for yaw (1x1 in this case)
+
+        # Simulate Gaussian noise
+        noise = np.random.normal(0,self.v_yaw_std)
+
+        # Add noise to the yaw measurement
+        noisy_yaw = yaw + noise  # noise[0] because the result is a 1D array
+        noisy_yaw = np.array([[noisy_yaw]])          # shape (1,1)
+        # Return the noisy yaw value and the covariance matrix
+        if self.yaw_reading_frequency !=0 and self.k % self.yaw_reading_frequency == 0:
+            # Provide readings at the predefined frequency
+            return noisy_yaw, R_yaw
+
+        else:
+            return np.zeros((0, 0)), np.zeros((0, 0))
+
+
+
+
+    def ReadCartesianFeature(self):
+        """ Simulates the Cartesian feature measurements from a range sensor.
+        
+        This function simulates a range sensor that detects features in the robot's surroundings
+        and returns their positions in Cartesian coordinates relative to the robot frame.
+        Only features within the maximum range (xy_max_range) are detected.
+
+        :return: features_xy, R_xy: List of detected feature positions in the robot frame,
+                and the measurement noise covariance matrix
+        """
+
+        if self.k % self.xy_feature_reading_frequency != 0:
+            # Provide readings at the predefined frequency
+            return [], []
+
+        detected_features = []
+
+        # Loop through all features in the map
+        for feature_position in self.M:
+            # Get current robot position
+            robot_position_x = self.xsk[0, 0]
+            robot_position_y = self.xsk[1, 0]
+
+            # Calculate distance to feature
+            dx = feature_position[0] - robot_position_x
+            dy = feature_position[1] - robot_position_y
+            distance_to_feature = np.sqrt(dx**2 + dy**2)
+
+            # Check if feature is within sensor range
+            if distance_to_feature <= self.xy_max_range:
+                # Generate measurement noise
+                measurement_noise = np.random.multivariate_normal(
+                    np.zeros(2), 
+                    [[self.range_covariance]]
+                )
+
+                # Transform feature to robot frame
+                robot_transform = Pose3D(self.xsk[:3]).ominus()
+                feature_in_robot_frame = robot_transform.boxplus(feature_position) + measurement_noise
+                
+                # Add to detected features list
+                detected_features.append(feature_in_robot_frame)
+
+        return detected_features, self.range_covariance
 
     def PlotRobot(self):
         """ Updates the plot of the robot at the current pose """

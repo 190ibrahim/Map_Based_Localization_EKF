@@ -1,6 +1,6 @@
 import Feature as f
 import numpy as np
-from math import cos, sin, atan2
+from math import cos, sin, atan2, sqrt
 
 def v2v(v):
     """
@@ -10,7 +10,8 @@ def v2v(v):
     :return: output vector
     """
 
-    pass
+    return v
+
 
 def J_v2v(v):
     """
@@ -19,7 +20,7 @@ def J_v2v(v):
     :param v: input vector
     :return: Identity matrix of the same dimensionality as the input vector.
     """
-    pass
+    return np.eye(len(v))
 
 def p2c(p):  # polar to cartesian conversion
     """
@@ -33,8 +34,10 @@ def p2c(p):  # polar to cartesian conversion
     :param p: point in polar coordinates
     :return: point in cartesian coordinates
     """
-
-    pass
+    rho, theta = p[0], p[1]
+    x = rho * cos(theta)
+    y = rho * sin(theta)
+    return np.array([x, y])
 
 
 def J_p2c(p):  # polar to cartesian conversion
@@ -49,7 +52,12 @@ def J_p2c(p):  # polar to cartesian conversion
     :return: Jacobian matrix :math:`J_{p2c}` (eq. :eq:`eq-Jp2c`)
     """
 
-    pass
+    rho, theta = p[0], p[1]
+    return np.array([
+        [cos(theta), -rho * sin(theta)],
+        [sin(theta), rho * cos(theta)]
+    ])
+
 
 
 def c2p(c):  # cartesian to spherical conversion
@@ -65,7 +73,10 @@ def c2p(c):  # cartesian to spherical conversion
     :return: point in polar coordinates
     """
 
-    pass
+    x, y = c[0], c[1]
+    rho = sqrt(x**2 + y**2)
+    theta = atan2(y, x)
+    return np.array([rho, theta])
 
 
 def J_c2p(c):  # cartesian to spherical conversion
@@ -79,8 +90,13 @@ def J_c2p(c):  # cartesian to spherical conversion
     :param c: point in cartesian coordinates
     :return: Jacobian matrix :math:`J_{c2p}` (eq. :eq:`eq-Jc2p`)
     """
-
-    pass
+    x, y = c[0], c[1]
+    rho_sq = x**2 + y**2
+    rho = sqrt(rho_sq)
+    return np.array([
+        [x / rho, y / rho],
+        [-y / rho_sq, x / rho_sq]
+    ])
 
 
 def s2c(s):  # spherical to cartesian conversion
@@ -101,7 +117,12 @@ def s2c(s):  # spherical to cartesian conversion
     :return: point in cartesian coordinates
     """
 
-    pass
+ 
+    rho, theta, phi = s[0], s[1], s[2]
+    x = rho * sin(theta) * cos(phi)
+    y = rho * sin(theta) * sin(phi)
+    z = rho * cos(theta)
+    return np.array([x, y, z])
 
 
 def J_s2c( s):  # spherical to cartesian conversion
@@ -115,8 +136,12 @@ def J_s2c( s):  # spherical to cartesian conversion
     :param s: linearization point in spherical coordinates
     :return: Jacobian matrix :math:`J_{s2c}` (eq. :eq:`eq-Js2c`)
     """
-
-    pass
+    rho, theta, phi = s[0], s[1], s[2]
+    return np.array([
+        [sin(theta) * cos(phi), rho * cos(theta) * cos(phi), -rho * sin(theta) * sin(phi)],
+        [sin(theta) * sin(phi), rho * cos(theta) * sin(phi), rho * sin(theta) * cos(phi)],
+        [cos(theta), -rho * sin(theta), 0]
+    ])
 
 
 def c2s(c):  # cartesian to spherical conversion
@@ -132,7 +157,11 @@ def c2s(c):  # cartesian to spherical conversion
     :return: point in spherical coordinates
     """
 
-    pass
+    x, y, z = c[0], c[1], c[2]
+    rho = sqrt(x**2 + y**2 + z**2)
+    theta = atan2(sqrt(x**2 + y**2), z)
+    phi = atan2(y, x)
+    return np.array([rho, theta, phi])
 
 
 def J_c2s(c):  # cartesian to spherical conversion
@@ -147,7 +176,15 @@ def J_c2s(c):  # cartesian to spherical conversion
     :return: Jacobian matrix :math:`J_{c2s}` (eq. :eq:`eq-Jc2s`)
     """
 
-    pass
-
+    x, y, z = c[0], c[1], c[2]
+    rho_sq = x**2 + y**2 + z**2
+    rho = sqrt(rho_sq)
+    xy_sq = x**2 + y**2
+    xy = sqrt(xy_sq)
+    return np.array([
+        [x / rho, y / rho, z / rho],
+        [x * z / (rho * xy), y * z / (rho * xy), -xy / rho_sq],
+        [-y / xy_sq, x / xy_sq, 0]
+    ])
 
 

@@ -72,12 +72,22 @@ class EKF(GaussianFilter):
         self.xk_1 = xk_1 if xk_1 is not None else self.xk_1
         self.Pk_1 = Pk_1 if Pk_1 is not None else self.Pk_1
 
-        self.uk = uk;
+        self.uk = uk 
         self.Qk = Qk  # store the input and noise covariance for logging
 
         # KF equations begin here
         # TODO: To be implemented by the student
 
+        # Predict the state estimate
+        self.xk_bar = self.f(self.xk_1, self.uk)
+
+        # Compute the Jacobians
+        Ak = self.Jfx(self.xk_1)
+        Wk = self.Jfw(self.xk_1)
+
+        # Predict the error covariance
+        self.Pk_bar = Ak @ self.Pk_1 @ Ak.T + Wk @ self.Qk @ Wk.T
+        
         return self.xk_bar, self.Pk_bar
 
     def Update(self, zk, Rk, xk_bar, Pk_bar, Hk, Vk):
@@ -96,11 +106,28 @@ class EKF(GaussianFilter):
         self.xk_bar = xk_bar
         self.Pk_bar = Pk_bar
         self.zk = zk;
-        self.nz = zk.shape[0];  # store dimensionality of the observation
+        self.nz = zk.shape[0] if isinstance(zk, np.ndarray) else 0 ;  # store dimensionality of the observation
         self.Rk = Rk  # store the observation and noise covariance for logging
 
-        # KF equations begin here
+        if not isinstance(zk, np.ndarray) or zk.size == 0 or not isinstance(Hk, np.ndarray) or Hk.size == 0:
+            self.xk = xk_bar
+            self.Pk = Pk_bar
+            return xk_bar, Pk_bar
+        
+        # Compute the innovation covariance (S)
+        S = Hk @ Pk_bar @ Hk.T + Vk @ Rk @ Vk.T 
 
-        # TODO: To be implemented by the student
+        # Compute the Kalman gain (Kk)
+        Kk = Pk_bar @ Hk.T @ np.linalg.inv(S)
+        
+        # Compute the innovation
+        innovation = zk - self.h(xk_bar)
+
+        # Update the state estimate
+        self.xk = xk_bar + Kk @ innovation
+
+        # Update the error covariance
+        I = np.eye(Pk_bar.shape[0])
+        self.Pk = (I - Kk @ Hk) @ Pk_bar @ (I - Kk @ Hk).T
 
         return self.xk, self.Pk

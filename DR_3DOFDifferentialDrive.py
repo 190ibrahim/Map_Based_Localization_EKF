@@ -1,7 +1,8 @@
 from Localization import *
 import numpy as np
 from DifferentialDriveSimulatedRobot import *
-
+from MapFeature import *
+from MapFeature import *
 class DR_3DOFDifferentialDrive(Localization):
     """
     Dead Reckoning Localization for a Differential Drive Mobile Robot.
@@ -32,7 +33,24 @@ class DR_3DOFDifferentialDrive(Localization):
 
         # TODO: to be completed by the student
 
-        pass
+
+        # TODO: IDK Store previous state and input for Logging purposes
+        self.etak_1 = xk_1  # store previous state
+        self.uk = uk  # store input
+
+
+        dL, dR = uk
+        # Calculate the change in pose
+        delta_d = (dR + dL) / 2  # average distance traveled
+        delta_theta = (dR - dL) / self.wheelBase  # change in orientation
+        
+        # Update the pose
+        x_k = xk_1[0] + delta_d * np.cos(xk_1[2] + delta_theta / 2)  
+        y_k = xk_1[1] + delta_d * np.sin(xk_1[2] + delta_theta / 2)  
+        psi_k = xk_1[2] + delta_theta  # new orientation
+        xk = np.array([x_k, y_k, psi_k])
+
+        return xk
 
     def GetInput(self):
         """
@@ -42,8 +60,16 @@ class DR_3DOFDifferentialDrive(Localization):
         """
 
         # TODO: to be completed by the student
+        uk, _ = self.robot.ReadEncoders()  # get the wheel encoder readings
+        left_wheel_pulses, right_wheel_pulses = uk  # unpack the input encoder readings
 
-        pass
+        # Calculate the distances traveled by each wheel
+        dL = (left_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi * self.wheelRadius)  # distance left wheel
+        dR = (right_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi * self.wheelRadius)  # distance right wheel
+        uk = np.array([dL, dR])
+
+        return uk
+        
 
 if __name__ == "__main__":
 

@@ -130,7 +130,15 @@ class CartesianFeature(Feature,np.ndarray):
 
         # TODO: To be completed by the student
 
-        return NxF
+        F = np.array([
+            [1, 0, 0],
+            [0, 1, 0]
+        ]) if BxF.shape[0] == 2 else np.array([
+            [1, 0, 0, 0],
+            [0, 1, 0, 0]
+        ])
+        NxF = F @ NxB.oplus(F.T @ BxF)
+        return CartesianFeature(NxF)
 
     def J_1boxplus(BxF, NxB):
         """
@@ -146,8 +154,17 @@ class CartesianFeature(Feature,np.ndarray):
         """
 
         # TODO: To be completed by the student
-
+        F = np.array([
+            [1, 0, 0],
+            [0, 1, 0]
+        ]) if BxF.shape[0] == 2 else np.array([
+            [1, 0, 0, 0],
+            [0, 1, 0, 0]
+        ])
+        J1_oplus = NxB.J_1oplus(F.T @ BxF)
+        J = F @ J1_oplus
         return J
+
 
     def J_2boxplus(BxF, NxB):
         """
@@ -163,7 +180,16 @@ class CartesianFeature(Feature,np.ndarray):
         """
 
         # TODO: To be completed by the student
-
+ 
+        F = np.array([
+            [1, 0, 0],
+            [0, 1, 0]
+        ]) if BxF.shape[0] == 2 else np.array([
+            [1, 0, 0, 0],
+            [0, 1, 0, 0]
+        ])
+        J2_oplus = NxB.J_2oplus()
+        J = F @ J2_oplus
         return J
 
     def ToCartesian(self):

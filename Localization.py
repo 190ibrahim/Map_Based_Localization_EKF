@@ -21,7 +21,6 @@ class Localization:
         self.kSteps = kSteps
         self.k = 0  # initialize log time step
         self.xk_1 = x0  # initialize state
-
         x_state_exists = False
         y_state_exists = False
         self.plot_xy_estimation = False

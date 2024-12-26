@@ -1,5 +1,6 @@
 import numpy as np
 from Feature import *
+import scipy
 
 class MapFeature:
     """
@@ -51,8 +52,10 @@ class MapFeature:
         :param v: vector in the storage representation
         :return: vector in the observation representation
         """
-        # TODO: To be implemented by the student
-
+          # Using boxplus for the conversion logic
+        NxB = self.Pose() # Robot pose (storage representation)
+        # Observation_representation = v.boxplus(NxB)
+        Observation_representation = v
         return Observation_representation
 
     def o2s(self, v):
@@ -65,6 +68,9 @@ class MapFeature:
         :return: vector in the storage representation
         """
         # TODO: To be implemented by the student
+        # Using ominus for the inverse conversion logic
+        NxB = self.GetRobotPose(self.xk)  # Robot pose (storage representation)
+        Storage_representation = v.ominus(NxB)
         return Storage_representation
 
     def J_s2o(self, v):
@@ -77,9 +83,12 @@ class MapFeature:
         :return: Jacobian of the conversion function from the storage representation to the observation representation
         """
         # TODO: To be implemented by the student
-
-        return J
-
+        # Using J_1boxplus for the Jacobian calculation
+        NxB = self.Pose()  # Robot pose (storage representation)
+        # print(v)
+        # J = J_p2c(v)
+        return np.eye(v.shape[0])
+    
     def J_o2s(self, v):
         """
         Jacobian of the conversion function from the observation representation to the storage representation.
@@ -90,6 +99,9 @@ class MapFeature:
         :return: Jacobian of the conversion function from the observation representation to the storage representation
         """
         # TODO: To be implemented by the student
+        # Using J_ominus for the Jacobian calculation
+        NxB = self.Pose()  # Robot pose (storage representation)
+        J = v.J_ominus(NxB)
         return J
 
     def hf(self, xk):  # Observation function for al zf observations
@@ -124,8 +136,12 @@ class MapFeature:
         :return: vector of expected features observations corresponding to the vector of observed features :math:`z_f`.
         """
         # TODO: To be implemented by the student
-
-        return _hf
+        _hf = []
+        for Fj in range(self.nz):
+            hfj = self.hfj(xk, Fj)  # Compute each feature's observation
+            _hf.append(hfj)
+        return np.vstack(_hf)
+    
 
     def Jhfx(self, xk):  # Jacobian wrt x of the feature observation function for all zf observations
         """
@@ -145,8 +161,11 @@ class MapFeature:
         """
 
         # TODO: To be implemented by the student
-
-        return J
+        J = []
+        for Fj in range(self.nf):
+            Jhfjx = self.Jhfjx(xk, Fj)  # Compute Jacobian for each feature
+            J.append(Jhfjx)
+        return np.vstack(J)
 
     def Jhfv(self, xk):  # Jacobian wrt v of the observation function for a feature
         """
@@ -171,6 +190,8 @@ class MapFeature:
         :return: Jacobian of the observation function :meth:`hf` with respect ro the observation noise :math:`v_k` :math:`J_{hfv}=I_{n_{zf}\\times n_{zf}}`
         """
         # TODO: To be implemented by the student
+        J = np.eye(self.nf * self.zfi_dim)
+
         return J
 
     def hfj(self, xk_bar, Fj):  # Observation function for zf_i and x_Fj
@@ -198,6 +219,9 @@ class MapFeature:
         # h(xk_bar,vk)=(-) xk_bar) [+] x_Fj + vk
 
         # TODO: To be implemented by the student
+        NxB = self.GetRobotPose(xk_bar)  # Extract robot pose
+        NxFj = self.M[Fj]  # Map feature
+        _hfj = self.s2o(NxFj.boxplus(NxB.ominus()))  # Apply s2o conversion
         return _hfj
 
     def Jhfjx(self, xk, Fj):  # Jacobian wrt x of the observation function for feature observation i
@@ -220,6 +244,26 @@ class MapFeature:
         """
         # J_hfjx = J_s2o @ J_1[+] * J_(-)
         # TODO: To be implemented by the student
+        # Get the robot pose from the state vector
+        NxB = self.GetRobotPose(xk)  
+
+        # Get the feature pose from the map
+        NxFj = self.M[Fj]
+
+        # Compute the required Jacobians
+        J_s2o = self.J_s2o(NxFj.boxplus(NxB.ominus()))
+        J_1boxplus = NxFj.J_1boxplus(NxB.ominus())
+        J_ominus = NxB.J_ominus()
+
+        # Calculate J_p (Jacobian for the positional states)
+        J_p = J_s2o @ J_1boxplus @ J_ominus
+
+        # Calculate J_np (Jacobian for non-positional states)
+        J_np = np.zeros((J_p.shape[0], xk.shape[0] - NxB.shape[0]))
+
+        # Concatenate the positional and non-positional Jacobians
+        J = np.hstack([J_p, J_np])
+
         return J
 
     def g(self, xk, BxFj):  # xBp [+] (BxFj + vk)
@@ -242,6 +286,8 @@ class MapFeature:
         """
 
         # TODO: To be implemented by the student
+        NxB = Pose3D(self.GetRobotPose(xk))
+        NxFj = NxB.boxplus(self.o2s(BxFj))
         return NxFj
 
     def Jgx(self, xk, BxFj):  # Jacobian wrt xk of the inverse sensor model for a single feature observation
@@ -262,6 +308,10 @@ class MapFeature:
         """
 
         # TODO: To be implemented by the student
+        NxB = Pose3D(self.GetRobotPose(xk))
+        J_1boxplus = NxB.J_1boxplus(self.o2s(BxFj))
+        F = np.hstack([np.eye(self.xBpose_dim), np.zeros((self.xBpose_dim, self.xk_1.size - self.xBpose_dim))])
+        J = J_1boxplus @ F
         return J
 
     def Jgv(self, xk, BxFj):
@@ -278,6 +328,11 @@ class MapFeature:
         :return: Jacobian of the inverse observation model :meth:`g` with respect to the observation noise :math:`J_{gv}` (see eq. :eq:`eq-Jgv`).
         """
         # TODO: To be implemented by the student
+        # NxB = self.  # Extract robot pose from the state
+        NxB = Pose3D(self.GetRobotPose(xk))
+        J_2boxplus = NxB.J_2boxplus(self.o2s(BxFj))
+        J_o2s = self.J_o2s(BxFj)
+        J = J_2boxplus @ J_o2s
         return J
 
 
@@ -299,6 +354,24 @@ class Cartesian2DMapFeature(MapFeature):
 
         """
         # TODO: To be implemented by the student
+        # Initialize empty array for feature measurements
+        zk = np.array([])
+
+        # Get range measurements and their covariance from robot sensors
+        range_measurements, range_covariance = self.robot.ReadCartesianFeature()
+
+        # Stack all measurements into a single column vector
+        for measurement in range_measurements:
+            zk = np.vstack([zk, measurement]) 
+        zk = zk.reshape(len(zk), 1)
+
+        # Create block diagonal covariance matrix from individual measurement covariances
+        Rk = scipy.linalg.block_diag(
+            *[range_covariance for _ in range(len(range_measurements))]
+            )
+        Rk = Rk.reshape(len(zk), len(zk))
+
+        # Return measurements and covariance matrix
         return zk, Rk
 
 

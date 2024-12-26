@@ -192,7 +192,16 @@ class Pose3D(Pose):
         """
         # TODO: To be completed by the student
 
-        return AxC
+       
+        xB, yB, yawB = AxB[0, 0], AxB[1, 0], AxB[2, 0]
+        xC, yC, yawC = BxC[0, 0], BxC[1, 0], BxC[2, 0]
+        
+        # Compounding operation
+        xA_C = xB + xC * cos(yawB) - yC * sin(yawB)
+        yA_C = yB + xC * sin(yawB) + yC * cos(yawB)
+        yawA_C = yawB + yawC
+        
+        return Pose3D(np.array([[xA_C], [yA_C], [yawA_C]]))
 
     def J_1oplus(AxB, BxC):
         """
@@ -214,6 +223,14 @@ class Pose3D(Pose):
         """
         # TODO: To be completed by the student
 
+        xC, yC, yawC = BxC[0, 0], BxC[1, 0], BxC[2, 0]
+        yawB = AxB[2, 0]
+
+        J1 = np.array([
+            [1, 0, -xC * sin(yawB) - yC * cos(yawB)],
+            [0, 1, xC * cos(yawB) - yC * sin(yawB)],
+            [0, 0, 1]
+        ])
         return J1
 
     def J_2oplus(AxB):
@@ -234,7 +251,13 @@ class Pose3D(Pose):
         :returns: Evaluation of the :math:`J_{2\\oplus}` Jacobian of the pose compounding operation with respect to the second pose (eq. :eq:`eq-J2oplus3dof`)
         """
         # TODO: To be completed by the student
+        yawB = AxB[2, 0]
 
+        J2 = np.array([
+            [cos(yawB), -sin(yawB), 0],
+            [sin(yawB), cos(yawB), 0],
+            [0, 0, 1]
+        ])
         return J2
 
     def ominus(AxB):
@@ -254,7 +277,14 @@ class Pose3D(Pose):
         """
         # TODO: To be completed by the student
 
-        return BxA
+        xB, yB, yawB = AxB[0, 0], AxB[1, 0], AxB[2, 0]
+        
+        # Inverse compounding operation
+        xB_A = -xB * cos(yawB) - yB * sin(yawB)
+        yB_A = xB * sin(yawB) - yB * cos(yawB)
+        yawB_A = -yawB
+        
+        return Pose3D(np.array([[xB_A], [yB_A], [yawB_A]]))
 
     def J_ominus(AxB):
         """
@@ -275,4 +305,11 @@ class Pose3D(Pose):
         """
         # TODO: To be completed by the student
 
+        xB, yB, yawB = AxB[0, 0], AxB[1, 0], AxB[2, 0]
+
+        J = np.array([
+            [-cos(yawB), -sin(yawB), xB * sin(yawB) - yB * cos(yawB)],
+            [sin(yawB), -cos(yawB), xB * cos(yawB) + yB * sin(yawB)],
+            [0, 0, -1]
+        ])
         return J

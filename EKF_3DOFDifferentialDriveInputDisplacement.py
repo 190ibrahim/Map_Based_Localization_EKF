@@ -2,7 +2,8 @@ from GFLocalization import *
 from EKF import *
 from DR_3DOFDifferentialDrive import *
 from DifferentialDriveSimulatedRobot import *
-
+from MapFeature import *
+from Pose import Pose3D
 class EKF_3DOFDifferentialDriveInputDisplacement(GFLocalization, DR_3DOFDifferentialDrive, EKF):
     """
     This class implements an EKF localization filter for a 3 DOF Diffenteial Drive using an input displacement motion model incorporating
@@ -33,22 +34,52 @@ class EKF_3DOFDifferentialDriveInputDisplacement(GFLocalization, DR_3DOFDifferen
         super().__init__(index, kSteps, robot, x0, P0, *args)
 
     def f(self, xk_1, uk):
-        # TODO: To be completed by the student
+        """
+        Motion model of the EKF.
 
+        :param xk_1: previous mean state vector (Pose3D object)
+        :param uk: input vector [dL, dR]
+        :return: xk_bar (Pose3D object)
+        """
+
+        xk_bar = Pose3D(xk_1).oplus(Pose3D(uk))
         return xk_bar
 
+
     def Jfx(self, xk_1):
+        """
+        Jacobian of the motion model with respect to the state vector. **Method to be overwritten by the child class**.
+
+        :param xk_1: Linearization point. By default the linearization point is the previous state vector taken from a class attribute.
+        :return: Jacobian matrix
+        """       
         # TODO: To be completed by the student
 
-        return J
+        return Pose3D(xk_1).J_1oplus(Pose3D(self.uk))
 
     def Jfw(self, xk_1):
+        """
+        Jacobian of the motion model with respect to the noise vector. **Method to be overwritten by the child class**.
+
+        :param xk_1: Linearization point. By default the linearization point is the previous state vector taken from a class attribute.
+        :return: Jacobian matrix
+        """
         # TODO: To be completed by the student
+
+        J = Pose3D.J_2oplus(xk_1)
 
         return J
 
-    def h(self, xk):  #:hm(self, xk):
+    def h(self, xk):  #:hm(self, xk):  # observation model
+        """
+        The observation model of the EKF is given by:
+        :return: expected observation vector
+        """
         # TODO: To be completed by the student
+        yaw  = xk[2,0]  # Heading from the state vector
+
+        h= np.array([[yaw]])
+
 
         return h  # return the expected observations
 
@@ -58,15 +89,42 @@ class EKF_3DOFDifferentialDriveInputDisplacement(GFLocalization, DR_3DOFDifferen
         :return: uk,Qk
         """
         # TODO: To be completed by the student
+        uk, Re = self.robot.ReadEncoders()  # get the wheel encoder readings
+        left_wheel_pulses, right_wheel_pulses = uk  # unpack the input encoder readings
 
-        return uk, Qk
+        # Calculate the distances traveled by each wheel
+        dL = (left_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi * self.wheelRadius)  # distance left wheel
+        dR = (right_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi * self.wheelRadius)  # distance right wheel
+        # Calculate the change in pose
+        delta_d = (dR + dL) / 2  # average distance traveled
+        d_theta = np.arctan2((dR - dL), self.wheelBase)  # change in orientation
+        
+        uk = np.array([delta_d,0, d_theta])
+
+        # Calculate the Jacobian of the input
+        J_uk = np.array([
+            [ (np.pi * self.wheelRadius) / self.robot.pulse_x_wheelTurns, (np.pi * self.wheelRadius) / self.robot.pulse_x_wheelTurns],
+            [0, 0],
+            [(-2 * np.pi * self.wheelRadius) / self.robot.pulse_x_wheelTurns, (2 * np.pi * self.wheelRadius) / self.robot.pulse_x_wheelTurns]
+        ])
+
+        # the covariance matrix Qk for the input noise
+        # Qk = (J_uk @ Re ) @ J_uk.T  # propagate the encoder noise through the Jacobian
+        Qk = np.matmul(np.matmul(J_uk, Re), J_uk.T).reshape(3, 3)
+        return uk.reshape(3, 1), Qk
 
     def GetMeasurements(self):  # override the observation model
         """
-
-        :return: zk, Rk, Hk, Vk
+        Get the measurements from the robot. Corresponds to the observation model:
+        :return: zk, Rk, Hk, Vk: observation vector and covariance of the observation noise. Hk is the Observation matrix and Vk is the noise observation matrix.
         """
         # TODO: To be completed by the student
+
+        zk, Rk = self.robot.ReadCompass()  # get the compass measurement
+        if zk.size == 0:
+            return zk, Rk, None, None
+        Hk = np.array([[0, 0, 1]])  # observation matrix
+        Vk = np.array([[1]])  # noise observation matrix
 
         return zk, Rk, Hk, Vk
 
@@ -93,5 +151,6 @@ if __name__ == '__main__':
 
     dd_robot = EKF_3DOFDifferentialDriveInputDisplacement(kSteps,robot)  # initialize robot and KF
     dd_robot.LocalizationLoop(x0, P0, np.array([[0.5, 0.03]]).T)
+
 
     exit(0)
