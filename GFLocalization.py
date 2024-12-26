@@ -95,10 +95,10 @@ class GFLocalization(Localization,GaussianFilter):
         xk, Pk = self.Update(zk, Rk, xk_bar, Pk_bar, Hk, Vk)
         # xk, Pk = xk_bar, Pk_bar 
         # Log the results
-        self.Log(self.robot.xsk_1, xk, Pk, xk_bar, zk)
+        # self.Log(self.robot.xsk, xk, Pk, xk_bar, zk)
 
-        # Plot the uncertainty ellipse
-        self.PlotUncertainty(xk, Pk)
+        # # Plot the uncertainty ellipse
+        # self.PlotUncertainty(xk, Pk)
         return xk, Pk, xk_bar, zk,Rk
 
     def LocalizationLoop(self, x0, P0, usk):

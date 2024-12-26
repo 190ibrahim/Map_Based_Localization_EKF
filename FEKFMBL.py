@@ -429,5 +429,6 @@ class FEKFMBL(GFLocalization, MapFeature):
         :param Pk: state vector covariance matrix :math:`P_k`
         :return: robot pose covariance :math:`P_{B_k}`
         """
+        print("Pk=",Pk)
         return Pk[0:self.xBpose_dim, 0:self.xBpose_dim]
 

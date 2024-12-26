@@ -75,8 +75,8 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         self.xy_max_range = 50  # maximum XY range, used to simulate the field of view
         self.range_covariance = 0.25**2  # covariance of simulated range noise
 
-        self.yaw_reading_frequency = 5 # frequency of Yasw readings
-        self.v_yaw_std = np.deg2rad(1)  # std deviation of simulated heading noise
+        self.yaw_reading_frequency = 100 # frequency of Yasw readings
+        self.v_yaw_std = np.deg2rad(5)  # std deviation of simulated heading noise
 
     def fs(self, xsk_1, usk):  # input velocity motion model with velocity noise
         """ Motion model used to simulate the robot motion. Computes the current robot state :math:`x_k` given the previous robot state :math:`x_{k-1}` and the input :math:`u_k`:
@@ -157,9 +157,7 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         """
 
         # TODO: to be completed by the student
-        if self.k % self.encoder_reading_frequency != 0:
-            # Provide readings at the predefined frequency
-            return [], []
+
         linear_velocity = self.xsk[3, 0]  # Linear velocity in the B-Frame (forward direction)
         angular_velocity = self.xsk[5, 0]  # Angular velocity in the B-Frame (around the z-axis)
 
@@ -177,7 +175,11 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         # Simulate encoder noise using multivariate Gaussian distribution based on the covariance matrix
         encoder_noise = np.random.multivariate_normal(mean=np.zeros(2), cov=self.Re)  # Reshape to (2, 1) # Noise covariance for encoder readings
         zsk += encoder_noise
-        return zsk, self.Re
+        if self.encoder_reading_frequency !=0 and self.k % self.encoder_reading_frequency == 0:
+            # Provide readings at the predefined frequency
+            return zsk, self.Re
+        else:
+            return np.zeros((0, 0)), np.zeros((0, 0))
 
     def ReadCompass(self):
         """ Simulates the compass reading of the robot.

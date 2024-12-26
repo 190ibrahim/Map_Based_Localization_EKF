@@ -56,7 +56,7 @@ class MapFeature:
         NxB = self.Pose() # Robot pose (storage representation)
         # Observation_representation = v.boxplus(NxB)
         Observation_representation = v
-        return Observation_representation
+        return v
 
     def o2s(self, v):
         """
@@ -71,7 +71,7 @@ class MapFeature:
         # Using ominus for the inverse conversion logic
         NxB = self.GetRobotPose(self.xk)  # Robot pose (storage representation)
         Storage_representation = v.ominus(NxB)
-        return Storage_representation
+        return v
 
     def J_s2o(self, v):
         """

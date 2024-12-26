@@ -84,7 +84,7 @@ class EKF(GaussianFilter):
         # Compute the Jacobians
         Ak = self.Jfx(self.xk_1)
         Wk = self.Jfw(self.xk_1)
-
+    
         # Predict the error covariance
         self.Pk_bar = Ak @ self.Pk_1 @ Ak.T + Wk @ self.Qk @ Wk.T
         

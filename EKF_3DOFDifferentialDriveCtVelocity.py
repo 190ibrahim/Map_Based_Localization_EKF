@@ -15,23 +15,18 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
                  IndexStruct("u", 3, 2), IndexStruct("v", 4, 3), IndexStruct("yaw_dot", 5, None)]
 
         # TODO: To be completed by the student
-        super().__init__(index, kSteps, robot, self.x0, self.P0, *args)
+        super().__init__(self.index, kSteps, robot, self.x0, self.P0, *args)
 
 
     def f(self, xk_1, uk):
         # TODO: To be completed by the student
         # Extract state components
         pose = xk_1[:3]  # [x, y, yaw]
-        velocities = xk_1[3:]  # [u, v, r]
+        velocities = xk_1[3:]  # [u, v, yaw_dot]
         
-        # Create displacement pose from velocities
         dt = self.dt
-        displacement = np.array([[velocities[0, 0] * dt],  # x displacement
-                                [velocities[1, 0] * dt],  # y displacement
-                                [velocities[2, 0] * dt]])  # angle displacement
-        
         # Use pose composition
-        new_pose = Pose3D(pose).oplus(Pose3D(displacement))
+        new_pose = Pose3D(pose).oplus(Pose3D(velocities * dt))
         
         # Combine with unchanged velocities
         xk_bar = np.vstack([new_pose, velocities])
@@ -39,25 +34,35 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
         return xk_bar
 
     def Jfx(self, xk_1):
-        # TODO: To be completed by the student
-        pose = xk_1[:3]
-        velocities = xk_1[3:]
-        dt = self.dt
-        
-        # Create displacement pose
-        displacement = np.array([[velocities[0, 0] * dt],
-                                [velocities[1, 0] * dt],
-                                [velocities[2, 0] * dt]])
-            
-        # Get J1 from pose composition
-        J1 = Pose3D(pose).J_1oplus(Pose3D(displacement))
-        
-        # Create full Jacobian
+        """
+        Computes the Jacobian of the motion model with respect to the state vector `xk_1`.
+
+        :param xk_1: The state vector at the previous time step
+        :return: Jacobian matrix of the motion model
+        """
+        # Extract pose and velocity from the state vector
+        pose = xk_1[:3]  
+        velocities = xk_1[3:] 
+        dt = self.dt  # Time step
+
+        # Compute Jacobians for the pose composition
+        J1 = Pose3D(pose).J_1oplus(Pose3D(velocities * dt))  # Jacobian wrt pose
+        J2 = Pose3D(pose).J_2oplus() * dt  # Jacobian wrt velocity scaled by dt
+
+        # Initialize a 6x6 Jacobian matrix
         J = np.zeros((6, 6))
+
+        # Fill the top-left block with J1 (wrt pose)
         J[:3, :3] = J1
-        J[3:, 3:] = np.eye(3)  # velocities remain unchanged
-        
+
+        # Fill the top-right block with J2 (wrt velocity)
+        J[:3, 3:] = J2
+
+        # Fill the bottom-right block with the identity matrix (velocity remains unchanged)
+        J[3:, 3:] = np.eye(3)
+
         return J
+
 
     def Jfw(self, xk_1):
         # TODO: To be completed by the student
@@ -65,88 +70,87 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
         dt = self.dt
         
         # Get J2 from pose composition
-        J2 = Pose3D(pose).J_2oplus()
+        J2 = Pose3D(pose).J_2oplus()  # Jacobian wrt velocity scaled by dt
         
         # Scale by dt for velocity integration
-        J = np.zeros((6, 6))
-        J[:3, :3] = J2 * dt
-        J[3:, 3:] = np.eye(3)
-        
+        J = np.zeros((6, 3))
+        J[:3, :] = (J2 * dt)/2
+        J[3:, :] = np.eye(3)
         return J
+    
     def h(self, xk):  #:hm(self, xk):
         # TODO: To be completed by the student
-        # Measurements: compass, u, v
-        h = np.array([[xk[2,0]],   # yaw from compass
-                    [xk[3,0]],   # u velocity
-                    [xk[4,0]]])  # v velocity
+        Hk = np.array([]).reshape((0, 6))
+        if self.robot.k % self.robot.yaw_reading_frequency == 0:
+            Hk = np.vstack([Hk,
+                           [0, 0, 1, 0, 0, 0],])
+        if self.robot.k % self.robot.encoder_reading_frequency == 0:
+            Hk = np.vstack([Hk,
+                           [0, 0, 0, 1, 0, 0],
+                           [0, 0, 0, 0, 1, 0],])
+        h = Hk @ xk
         return h
 
     def GetInput(self):
         """
+        Computes the control input vector `uk` and the process noise covariance `Qk`.
 
-        :return: uk,Qk:
+        :return: uk (empty, as there is no direct input), Qk (uncertainty in x, y, theta)
         """
-        # TODO: To be completed by the student
         # No direct input in constant velocity model
-        uk = np.zeros((6,1))
-        # Process noise covariance
-        Qk = np.diag([0.1**2, 0.1**2, (np.pi/180)**2,  # pose noise
-                      0.5**2, 0.1**2, (np.pi/60)**2])   # velocity noise
+        uk = np.array([])
+        Qk = self.robot.Qsk
+
         return uk, Qk
+
     
     
-    def GetMeasurements(self):  # override the observation model
+    def GetMeasurements(self):
         """
         Retrieve sensor measurements and construct the observation vector (zk),
         noise covariance matrix (Rk), observation Jacobian (Hk), and noise Jacobian (Vk).
-        
+
         :return: zk, Rk, Hk, Vk
         """
-        zsk, Re = self.robot.ReadEncoders()    # e.g., shape (2,1) if it returns [u_enc, v_enc]
-        yaw, Ryaw = self.robot.ReadCompass()   # shape (1,1)
+        zsk, Re = self.robot.ReadEncoders()
+        yaw, Ryaw = self.robot.ReadCompass()
 
-        # Combine them into a single measurement vector
-        if zsk.size > 0 and yaw.size > 0:
+        # Initialize default values
+        zk = np.array([]).reshape((0, 1))
+        Rk = np.array([]).reshape((0, 0))
+        Hk = np.array([]).reshape((0, 6))
+        Vk = np.array([]).reshape((0, 0))   
 
-            # Make sure yaw is (1,1):
-            if not isinstance(yaw, np.ndarray):
-                yaw = np.array([[yaw]])           # shape (1,1)
-            elif yaw.ndim == 1:
-                yaw = yaw.reshape((1,1))
+        # Handle compass reading
+        if yaw.size > 0:
+            yaw = np.array([[yaw]]) if yaw.ndim == 1 else yaw.reshape((1, 1))
+            zk = yaw
+            Rk = Ryaw
+            Hk = np.zeros((1, 6))
+            Hk[0, 2] = 1.0  # yaw measurement
+            Vk = np.eye(1)
 
-            # Make sure zsk is (2,1) if it holds two scalar readings:
-            if zsk.ndim == 1:
-                zsk = zsk.reshape((2,1))          # shape (2,1)
-            
-            # Now stack them
-            zk = np.vstack([yaw, zsk])            # shape (3,1)
+        # Handle encoder readings
+        if zsk.size > 0:
+            left_wheel_pulses, right_wheel_pulses = zsk
+            wl = (left_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi / self.dt)
+            wr = (right_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi / self.dt)
+            u = self.wheelRadius/2 * (wl + wr)
+            yaw_dot = self.wheelBase / (2 * self.wheelRadius) * (wr - wl)
 
-            # Build Rk as a block diagonal of Ryaw (1×1) and Re (2×2)
-            Rk = scipy.linalg.block_diag(Ryaw, Re)  # shape (3,3)
-        else:
-            # If no measurements are available this time, return empties or None
-            zk = np.array([])
-            Rk = np.array([])
+            encoder_z = np.array([[u], [0]])
+            J_zsk = np.array([[self.wheelRadius/(2*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi), self.wheelRadius/(2*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi)],
+                     [0, 0]])
+            encoder_R = (J_zsk @ Re) @ J_zsk.T
 
-        # Hk: This is how your 6D state maps to [theta, u, v].
-        # => Hk shape: (3×6)
-        Hk = np.zeros((3, 6))
-
-        #   row 0 measures theta => depends on state[2]
-        Hk[0, 2] = 1.0
-
-        #   row 1 measures u => depends on state[3]
-        Hk[1, 3] = 1.0
-
-        #   row 2 measures v => depends on state[4]
-        Hk[2, 4] = 1.0
-        print(Hk)
-        # Vk: If noise is uncorrelated and each measurement has 1 noise dimension,
-        #     simply an identity of size 3×3.
-        if zk.size > 0:
-            Vk = np.eye(3)  # shape (3×3)
-        else:
-            Vk = np.array([])
+            # Combine with existing measurements if any
+            zk = np.vstack([zk, encoder_z]) if zk.size > 0 else encoder_z
+            Rk = scipy.linalg.block_diag(Rk, encoder_R) if Rk.size > 0 else encoder_R
+            encoder_H = np.zeros((2, 6))
+            encoder_H[0, 3] = 1.0  # u
+            encoder_H[1, 4] = 1.0  # v
+            Hk = np.vstack([Hk, encoder_H]) if Hk.size > 0 else encoder_H
+            Vk = np.eye(zk.shape[0])
 
         return zk, Rk, Hk, Vk
 

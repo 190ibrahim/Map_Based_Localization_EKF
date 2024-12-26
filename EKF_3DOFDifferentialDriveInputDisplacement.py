@@ -109,8 +109,7 @@ class EKF_3DOFDifferentialDriveInputDisplacement(GFLocalization, DR_3DOFDifferen
         ])
 
         # the covariance matrix Qk for the input noise
-        # Qk = (J_uk @ Re ) @ J_uk.T  # propagate the encoder noise through the Jacobian
-        Qk = np.matmul(np.matmul(J_uk, Re), J_uk.T).reshape(3, 3)
+        Qk = (J_uk @ Re ) @ J_uk.T  # propagate the encoder noise through the Jacobian
         return uk.reshape(3, 1), Qk
 
     def GetMeasurements(self):  # override the observation model
