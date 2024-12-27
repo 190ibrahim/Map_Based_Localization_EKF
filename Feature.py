@@ -189,7 +189,7 @@ class CartesianFeature(Feature,np.ndarray):
             [0, 1, 0, 0]
         ])
         J2_oplus = NxB.J_2oplus()
-        J = F @ J2_oplus
+        J = F @ J2_oplus @ F.T
         return J
 
     def ToCartesian(self):

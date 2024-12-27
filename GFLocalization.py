@@ -85,15 +85,20 @@ class GFLocalization(Localization,GaussianFilter):
         # Get the input from the robot
         uk, Qk = self.GetInput()
         # Prediction step
-        xk_bar, Pk_bar = self.Prediction(uk, Qk, xk_1, Pk_1)
-
+        if uk.size>0:
+            xk_bar, Pk_bar = self.Prediction(uk, Qk, xk_1, Pk_1)
+        else:
+            xk_bar, Pk_bar = xk_1, Pk_1
         # Get the measurements from the robot
         zk, Rk, Hk, Vk = self.GetMeasurements()
 
 
         # Update step
-        xk, Pk = self.Update(zk, Rk, xk_bar, Pk_bar, Hk, Vk)
-        # xk, Pk = xk_bar, Pk_bar 
+        if zk.size>0:
+            xk, Pk = self.Update(zk, Rk, xk_bar, Pk_bar, Hk, Vk)
+        else:
+            self.xk = xk_bar
+            xk, Pk = xk_bar, Pk_bar 
         # Log the results
         # self.Log(self.robot.xsk, xk, Pk, xk_bar, zk)
 
@@ -116,7 +121,7 @@ class GFLocalization(Localization,GaussianFilter):
 
         for self.k in range(self.kSteps):
             xsk = self.robot.fs(xsk_1, usk)  # Simulate the robot motion
-            xk, Pk, xk_bar, zk,Rk = self.Localize(xk_1, Pk_1)  # Localize the robot
+            xk, Pk, xk_bar, zk, Rk = self.Localize(xk_1, Pk_1)  # Localize the robot
 
             xsk_1 = xsk  # current state becomes previous state for next iteration
             xk_1 = xk

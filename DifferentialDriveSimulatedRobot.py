@@ -73,7 +73,7 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
 
         self.xy_feature_reading_frequency = 50  # frequency of XY feature readings
         self.xy_max_range = 50  # maximum XY range, used to simulate the field of view
-        self.range_covariance = 0.25**2  # covariance of simulated range noise
+        self.range_covariance = 0.1**2  # covariance of simulated range noise
 
         self.yaw_reading_frequency = 100 # frequency of Yasw readings
         self.v_yaw_std = np.deg2rad(5)  # std deviation of simulated heading noise
@@ -245,7 +245,8 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
                 # Generate measurement noise
                 measurement_noise = np.random.multivariate_normal(
                     np.zeros(2), 
-                    [[self.range_covariance]]
+                    [[self.range_covariance, 0],
+                     [0, self.range_covariance]]
                 )
 
                 # Transform feature to robot frame

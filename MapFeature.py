@@ -70,7 +70,7 @@ class MapFeature:
         # TODO: To be implemented by the student
         # Using ominus for the inverse conversion logic
         NxB = self.GetRobotPose(self.xk)  # Robot pose (storage representation)
-        Storage_representation = v.ominus(NxB)
+        # Storage_representation = v.ominus(NxB)
         return v
 
     def J_s2o(self, v):
@@ -101,8 +101,8 @@ class MapFeature:
         # TODO: To be implemented by the student
         # Using J_ominus for the Jacobian calculation
         NxB = self.Pose()  # Robot pose (storage representation)
-        J = v.J_ominus(NxB)
-        return J
+        # J = v.J_ominus(NxB)
+        return np.eye(v.shape[0])
 
     def hf(self, xk):  # Observation function for al zf observations
         """
@@ -330,7 +330,7 @@ class MapFeature:
         # TODO: To be implemented by the student
         # NxB = self.  # Extract robot pose from the state
         NxB = Pose3D(self.GetRobotPose(xk))
-        J_2boxplus = NxB.J_2boxplus(self.o2s(BxFj))
+        J_2boxplus = self.o2s(BxFj).J_2boxplus(NxB)
         J_o2s = self.J_o2s(BxFj)
         J = J_2boxplus @ J_o2s
         return J
@@ -355,21 +355,21 @@ class Cartesian2DMapFeature(MapFeature):
         """
         # TODO: To be implemented by the student
         # Initialize empty array for feature measurements
-        zk = np.array([])
-
+        zk = np.array([]).reshape(0, 2)
+        Rk = np.array([]).reshape(0, 0)
         # Get range measurements and their covariance from robot sensors
         range_measurements, range_covariance = self.robot.ReadCartesianFeature()
 
         # Stack all measurements into a single column vector
         for measurement in range_measurements:
             zk = np.vstack([zk, measurement]) 
-        zk = zk.reshape(len(zk), 1)
+            Rk = np.append(Rk, range_covariance)
 
         # Create block diagonal covariance matrix from individual measurement covariances
         Rk = scipy.linalg.block_diag(
-            *[range_covariance for _ in range(len(range_measurements))]
+            *Rk
             )
-        Rk = Rk.reshape(len(zk), len(zk))
+        # Rk = Rk.reshape(len(zk), len(zk))
 
         # Return measurements and covariance matrix
         return zk, Rk

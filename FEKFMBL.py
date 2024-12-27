@@ -65,10 +65,14 @@ class FEKFMBL(GFLocalization, MapFeature):
         """
 
         # TODO: To be completed by the student
-
+        
         hm = self.hm(xk)  # Measurement observations
         hf = self.hf(xk)  # Feature observations
-        h_mf = np.vstack([hm, hf])  # Combine measurements and feature observations
+        h_mf = np.array([]).reshape(0,1)  # Stacked observations 
+        if hf.size == 0:
+            h_mf = np.vstack([h_mf, hm])  # Only measurements
+        if hm.size == 0:
+            h_mf = np.vstack([h_mf, hf])   # Only features
         return h_mf
 
     def hm(self,xk):
@@ -82,7 +86,9 @@ class FEKFMBL(GFLocalization, MapFeature):
         """
 
         # TODO: To be completed by the student
-        _hm = super().h(xk)
+        _hm = super().h(xk)  # Call parent method
+        # if self.robot.k % self.robot.yaw_reading_frequency == 0:
+        #     _hm = xk[2]  # Yaw observation
         return _hm
 
     def SquaredMahalanobisDistance(self, hfj, Pfj, zfi, Rfi):
@@ -97,9 +103,10 @@ class FEKFMBL(GFLocalization, MapFeature):
         """
 
         # TODO: To be completed by the student
-        Vij = zfi - hfj  # Difference between observed and expected feature
-        Sij = Pfj + Rfi
-        D2_ij = Vij.T @ np.linalg.inv(Sij) @ Vij
+        Vij = (zfi - hfj).T  # Difference between observed and expected feature
+        Rfi_matrix = np.diag(Rfi[:Pfj.shape[0]])  # Convert the diagonal elements vector to a matrix with matching size
+        Sij = Rfi_matrix + Pfj  # Covariance matrix of the difference
+        D2_ij = float((Vij @ np.linalg.inv(Sij) @ Vij.T)[0, 0])  # Extract scalar value
         return D2_ij
 
     def IndividualCompatibility(self, D2_ij, dof, alpha):
@@ -135,12 +142,12 @@ class FEKFMBL(GFLocalization, MapFeature):
         H = []  # Association hypothesis
         
         # Loop over observations
-        for j in range(zf.shape[0]):
+        for j in range(self.zfi_dim):
             nearest = None
             D2_min = float('inf')
             
             # Loop over features
-            for i in range(hf.shape[0]):
+            for i in range(self.nf):
                 # Compute squared Mahalanobis distance
                 D2_ij = self.SquaredMahalanobisDistance(hf[i], Phf[i], zf[j], Rf[j])
                 
@@ -188,10 +195,6 @@ class FEKFMBL(GFLocalization, MapFeature):
             hf.append(h_fi)
             Pf.append(P_fi)
         
-        # Convert lists to arrays
-        hf = np.vstack(hf)
-        Pf = scipy.linalg.block_diag(*Pf)
-        
         # Step 2: Call ICNN to get the association hypothesis
         H = self.ICNN(hf, Pf, zf, Rf, self.xF_dim )
         
@@ -207,31 +210,35 @@ class FEKFMBL(GFLocalization, MapFeature):
         :return xk, Pk: updated state vector and covariance matrix
         """
 
-        # TODO: To be completed by the student
         # Step 1: Get input from motion model
         uk, Qk = self.GetInput()
 
         # Step 2: Perform prediction
-        xk, Pk = self.Prediction(xk_1, Pk_1, uk, Qk)
+        self.xk_bar, self.Pk_bar = self.Prediction(xk_1, Pk_1, uk, Qk)
 
         # Step 3: Read measurements and features
         zm, Rm, Hm, Vm = self.GetMeasurements()
         zf, Rf = self.GetFeatures()
-        # zf, Rf, Hf, Vf = self.GetFeatures()
 
-        # Step 4: Data association
-        Hp = self.DataAssociation(xk, Pk, zf, Rf)
+        # Step 4: Data association if we have features
+        if zf.size > 0 and Rf.size > 0:
+            Hp = self.DataAssociation(self.xk_bar, self.Pk_bar, zf, Rf)
+        else:
+            Hp = []
 
-        # Step 5: Stack measurements and features
+        # Step 5: Stack measurements and features 
         zk, Rk, Hk, Vk, znp, Rnp = self.StackMeasurementsAndFeatures(zm, Rm, Hm, Vm, zf, Rf, Hp)
 
-        # Step 6: Update
-        xk, Pk = self.Update(xk, Pk, zk, Rk, Hk, Vk)
+        # Step 6: Update if we have observations
+        if zk.size > 0:
+            self.xk, self.Pk = self.Update(self.xk_bar, self.Pk_bar, zk, Rk, Hk, Vk)
+        else:
+            self.xk, self.Pk = self.xk_bar, self.Pk_bar
+        # Step 7: Plot uncertainty if we have features
+        if zf.size > 0:
+            self.PlotUncertainty(zf, Rf)
 
-        # Step 7: Plot uncertainty
-        self.PlotUncertainty(zf, Rf)
-
-        return xk, Pk
+        return self.xk, self.Pk, self.xk_bar, zk, Rk 
 
     def StackMeasurementsAndFeatures(self, zm, Rm, Hm, Vm, zf, Rf, H):
         """
@@ -429,6 +436,5 @@ class FEKFMBL(GFLocalization, MapFeature):
         :param Pk: state vector covariance matrix :math:`P_k`
         :return: robot pose covariance :math:`P_{B_k}`
         """
-        print("Pk=",Pk)
         return Pk[0:self.xBpose_dim, 0:self.xBpose_dim]
 
