@@ -118,7 +118,7 @@ class EKF(GaussianFilter):
         S = Hk @ Pk_bar @ Hk.T + Vk @ Rk @ Vk.T 
 
         # Compute the Kalman gain (Kk)
-        Kk = Pk_bar @ Hk.T @ np.linalg.inv(S)
+        Kk = Pk_bar @ Hk.T @ np.linalg.pinv(S)
         
         # Compute the innovation
         innovation = zk - self.h(xk_bar)

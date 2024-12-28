@@ -82,29 +82,14 @@ class GFLocalization(Localization,GaussianFilter):
         """
 
         # TODO: To be implemented by the student
-        # Get the input from the robot
         uk, Qk = self.GetInput()
-        # Prediction step
-        if uk.size>0:
-            xk_bar, Pk_bar = self.Prediction(uk, Qk, xk_1, Pk_1)
-        else:
-            xk_bar, Pk_bar = xk_1, Pk_1
-        # Get the measurements from the robot
+        xk_bar, Pk_bar = self.Prediction(uk, Qk, xk_1, Pk_1)
         zk, Rk, Hk, Vk = self.GetMeasurements()
+        xk, Pk = self.Update(zk, Rk, xk_bar, Pk_bar, Hk, Vk)
 
-
-        # Update step
-        if zk.size>0:
-            xk, Pk = self.Update(zk, Rk, xk_bar, Pk_bar, Hk, Vk)
-        else:
-            self.xk = xk_bar
-            xk, Pk = xk_bar, Pk_bar 
-        # Log the results
-        # self.Log(self.robot.xsk, xk, Pk, xk_bar, zk)
-
-        # # Plot the uncertainty ellipse
-        # self.PlotUncertainty(xk, Pk)
-        return xk, Pk, xk_bar, zk,Rk
+        self.PlotUncertainty(xk, Pk)
+        
+        return xk, Pk, xk_bar, zk, Rk
 
     def LocalizationLoop(self, x0, P0, usk):
         """
@@ -130,7 +115,6 @@ class GFLocalization(Localization,GaussianFilter):
             self.Log(xsk, xk, Pk, xk_bar, zk)
 
             # Plot the uncertainty ellipse
-            self.PlotUncertainty(xk, Pk)
         self.PlotState()  # plot the state estimation results
         plt.show()
 

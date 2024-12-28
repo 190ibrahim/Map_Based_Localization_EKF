@@ -74,8 +74,8 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
         
         # Scale by dt for velocity integration
         J = np.zeros((6, 3))
-        J[:3, :] = (J2 * dt)/2
-        J[3:, :] = np.eye(3)
+        J[:3, :] = (J2 * (dt**2))/2
+        J[3:, :] = np.eye(3)*dt
         return J
     
     def h(self, xk):  #:hm(self, xk):
@@ -136,11 +136,11 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
             wl = (left_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi / self.dt)
             wr = (right_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi / self.dt)
             u = self.wheelRadius/2 * (wl + wr)
-            yaw_dot = self.wheelBase / (2 * self.wheelRadius) * (wr - wl)
+            yaw_dot = (self.wheelRadius * (wr - wl)) / self.wheelBase
 
-            encoder_z = np.array([[u], [0]])
+            encoder_z = np.array([[u], [yaw_dot]])
             J_zsk = np.array([[self.wheelRadius/(2*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi), self.wheelRadius/(2*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi)],
-                     [0, 0]])
+                             [-self.wheelRadius/(self.wheelBase*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi), self.wheelRadius/(self.wheelBase*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi)]])
             encoder_R = (J_zsk @ Re) @ J_zsk.T
 
             # Combine with existing measurements if any

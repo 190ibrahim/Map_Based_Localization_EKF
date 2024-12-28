@@ -76,10 +76,11 @@ class EKF_3DOFDifferentialDriveInputDisplacement(GFLocalization, DR_3DOFDifferen
         :return: expected observation vector
         """
         # TODO: To be completed by the student
-        yaw  = xk[2,0]  # Heading from the state vector
-
-        h= np.array([[yaw]])
-
+        if self.robot.yaw_reading_frequency !=0 and self.robot.k % self.robot.yaw_reading_frequency == 0:
+            yaw  = xk[2,0]  # Heading from the state vector
+            h= np.array([[yaw]])
+        else:
+            h=np.array([[]])
 
         return h  # return the expected observations
 

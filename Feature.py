@@ -220,13 +220,13 @@ if __name__ == '__main__':
     print("J_1boxplus=", BxF.J_1boxplus(NxB3dof))
     print("J_2boxplus=", BxF.J_2boxplus(NxB3dof))
 
-    NxB4dof=Pose4D(np.array([[5,5,5,np.pi/2]]).T)
+    # NxB4dof=Pose4D(np.array([[5,5,5,np.pi/2]]).T)
 
-    NxF = BxF.boxplus(NxB4dof)
+    # NxF = BxF.boxplus(NxB4dof)
 
-    print("NxF=", NxF.T)
-    print("J_1boxplus=", BxF.J_1boxplus(NxB4dof))
-    print("J_2boxplus=", BxF.J_2boxplus(NxB4dof))
+    # print("NxF=", NxF.T)
+    # print("J_1boxplus=", BxF.J_1boxplus(NxB4dof))
+    # print("J_2boxplus=", BxF.J_2boxplus(NxB4dof))
 
     exit(0)
 
