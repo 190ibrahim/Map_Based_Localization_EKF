@@ -71,11 +71,11 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         self.Polar2D_max_range = 50  # maximum Polar2D range, used to simulate the field of view
         self.Rfp = np.diag(np.array([1 ** 2, np.deg2rad(5) ** 2]))  # covariance of simulated Polar2D feature noise
 
-        self.xy_feature_reading_frequency = 50  # frequency of XY feature readings
+        self.xy_feature_reading_frequency = 1  # frequency of XY feature readings
         self.xy_max_range = 50  # maximum XY range, used to simulate the field of view
-        self.range_covariance = 0.25**2  # covariance of simulated range noise
+        self.fxy = np.diag(np.array([0.1**2,0.1**2]))  # covariance of simulated range noise
 
-        self.yaw_reading_frequency = 100 # frequency of Yasw readings
+        self.yaw_reading_frequency = 1 # frequency of Yasw readings
         self.v_yaw_std = np.deg2rad(5)  # std deviation of simulated heading noise
 
     def fs(self, xsk_1, usk):  # input velocity motion model with velocity noise
@@ -210,8 +210,6 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
             return np.zeros((0, 0)), np.zeros((0, 0))
 
 
-
-
     def ReadCartesianFeature(self):
         """ Simulates the Cartesian feature measurements from a range sensor.
         
@@ -225,37 +223,27 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
 
         if self.k % self.xy_feature_reading_frequency != 0:
             # Provide readings at the predefined frequency
-            return [], []
+            return [], np.zeros((0, 0))
 
-        detected_features = []
-
+        zf = []
+        Rf = []
         # Loop through all features in the map
         for feature_position in self.M:
             # Get current robot position
-            robot_position_x = self.xsk[0, 0]
-            robot_position_y = self.xsk[1, 0]
-
-            # Calculate distance to feature
-            dx = feature_position[0] - robot_position_x
-            dy = feature_position[1] - robot_position_y
-            distance_to_feature = np.sqrt(dx**2 + dy**2)
+            distance_to_feature = np.linalg.norm(feature_position- self.xsk[:2])
 
             # Check if feature is within sensor range
             if distance_to_feature <= self.xy_max_range:
                 # Generate measurement noise
-                measurement_noise = np.random.multivariate_normal(
-                    np.zeros(2), 
-                    [[self.range_covariance]]
-                )
-
+                measurement_noise = np.random.normal(0, np.sqrt(self.fxy.diagonal())).reshape((len(self.fxy), 1))
+                
                 # Transform feature to robot frame
                 robot_transform = Pose3D(self.xsk[:3]).ominus()
-                feature_in_robot_frame = robot_transform.boxplus(feature_position) + measurement_noise
-                
+                feature_in_robot_frame = feature_position.boxplus(robot_transform) + measurement_noise
                 # Add to detected features list
-                detected_features.append(feature_in_robot_frame)
-
-        return detected_features, self.range_covariance
+                zf.append(feature_in_robot_frame)
+                Rf.append(self.fxy)
+        return zf, Rf
 
     def PlotRobot(self):
         """ Updates the plot of the robot at the current pose """
