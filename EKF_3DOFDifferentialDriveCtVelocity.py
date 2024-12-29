@@ -15,6 +15,9 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
                  IndexStruct("u", 3, 2), IndexStruct("v", 4, 3), IndexStruct("yaw_dot", 5, None)]
 
         # TODO: To be completed by the student
+        self.t_1 = 0
+        self.t = 0
+        self.Dt = self.t - self.t_1
         super().__init__(self.index, kSteps, robot, self.x0, self.P0, *args)
 
 
@@ -22,7 +25,7 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
         # TODO: To be completed by the student
         # Extract state components
         pose = xk_1[:3]  # [x, y, yaw]
-        velocities = xk_1[3:]  # [u, v, yaw_dot]
+        velocities = xk_1[3:]
         
         dt = self.dt
         # Use pose composition
@@ -88,6 +91,8 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
             Hk = np.vstack([Hk,
                            [0, 0, 0, 1, 0, 0],
                            [0, 0, 0, 0, 1, 0],])
+        if Hk.size == 0:
+            return np.array([]).reshape((0, 1))
         h = Hk @ xk
         return h
 
@@ -98,7 +103,7 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
         :return: uk (empty, as there is no direct input), Qk (uncertainty in x, y, theta)
         """
         # No direct input in constant velocity model
-        uk = np.array([])
+        uk = [None]
         Qk = self.robot.Qsk
 
         return uk, Qk
@@ -136,11 +141,15 @@ class EKF_3DOFDifferentialDriveCtVelocity(GFLocalization, DR_3DOFDifferentialDri
             wl = (left_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi / self.dt)
             wr = (right_wheel_pulses / self.robot.pulse_x_wheelTurns) * (2 * np.pi / self.dt)
             u = self.wheelRadius/2 * (wl + wr)
-            yaw_dot = (self.wheelRadius * (wr - wl)) / self.wheelBase
+            theta_dot = (self.wheelRadius * (wr - wl)) / self.wheelBase
 
-            encoder_z = np.array([[u], [yaw_dot]])
+            # encoder_z = np.array([[u], [theta_dot]])
+            # J_zsk = np.array([[self.wheelRadius/(2*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi), self.wheelRadius/(2*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi)],
+            #                  [-self.wheelRadius/(self.wheelBase*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi), self.wheelRadius/(self.wheelBase*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi)]])
+            # encoder_R = (J_zsk @ Re) @ J_zsk.T
+            encoder_z = np.array([[u], [0]])
             J_zsk = np.array([[self.wheelRadius/(2*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi), self.wheelRadius/(2*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi)],
-                             [-self.wheelRadius/(self.wheelBase*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi), self.wheelRadius/(self.wheelBase*self.dt*self.robot.pulse_x_wheelTurns)*(2*np.pi)]])
+                             [0, 0]])
             encoder_R = (J_zsk @ Re) @ J_zsk.T
 
             # Combine with existing measurements if any

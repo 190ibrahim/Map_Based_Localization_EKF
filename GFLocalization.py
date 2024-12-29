@@ -83,12 +83,18 @@ class GFLocalization(Localization,GaussianFilter):
 
         # TODO: To be implemented by the student
         uk, Qk = self.GetInput()
-        xk_bar, Pk_bar = self.Prediction(uk, Qk, xk_1, Pk_1)
-        zk, Rk, Hk, Vk = self.GetMeasurements()
-        xk, Pk = self.Update(zk, Rk, xk_bar, Pk_bar, Hk, Vk)
+        if len(uk) > 0:
+            xk_bar, Pk_bar = self.Prediction(uk, Qk, xk_1, Pk_1)
+        else:
+            xk_bar, Pk_bar = xk_1, Pk_1
 
+        zk, Rk, Hk, Vk = self.GetMeasurements()
+        if len(zk) > 0:
+            xk, Pk = self.Update(zk, Rk, xk_bar, Pk_bar, Hk, Vk)
+        else:
+            xk, Pk = xk_bar, Pk_bar
         self.PlotUncertainty(xk, Pk)
-        
+        self.Log(self.robot.xsk, xk, Pk, xk_bar, zk)
         return xk, Pk, xk_bar, zk, Rk
 
     def LocalizationLoop(self, x0, P0, usk):
@@ -98,12 +104,9 @@ class GFLocalization(Localization,GaussianFilter):
         :param x0: initial state vector
         :param P0: initial covariance matrix
         """
-
         xk_1 = x0
         Pk_1 = P0
-
         xsk_1 = self.robot.xsk_1
-
         for self.k in range(self.kSteps):
             xsk = self.robot.fs(xsk_1, usk)  # Simulate the robot motion
             xk, Pk, xk_bar, zk, Rk = self.Localize(xk_1, Pk_1)  # Localize the robot
@@ -111,10 +114,7 @@ class GFLocalization(Localization,GaussianFilter):
             xsk_1 = xsk  # current state becomes previous state for next iteration
             xk_1 = xk
             Pk_1 = Pk
-            # Log the results
-            self.Log(xsk, xk, Pk, xk_bar, zk)
 
-            # Plot the uncertainty ellipse
         self.PlotState()  # plot the state estimation results
         plt.show()
 
@@ -122,7 +122,6 @@ class GFLocalization(Localization,GaussianFilter):
 
         xk_dim = len(xk_bar)
         xk_bar_dim = len(xk_bar)
-
         # initialize the log arrays if they don't exist
         if not hasattr(self, 'log_x'): self.log_x = np.zeros((xk.shape[0], self.kSteps))
         if not hasattr(self, 'log_xs'): self.log_xs = np.zeros((xsk.shape[0], self.kSteps))

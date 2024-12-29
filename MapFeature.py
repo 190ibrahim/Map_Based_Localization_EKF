@@ -52,10 +52,6 @@ class MapFeature:
         :param v: vector in the storage representation
         :return: vector in the observation representation
         """
-          # Using boxplus for the conversion logic
-        NxB = self.Pose() # Robot pose (storage representation)
-        # Observation_representation = v.boxplus(NxB)
-        Observation_representation = v
         return v
 
     def o2s(self, v):
@@ -68,9 +64,6 @@ class MapFeature:
         :return: vector in the storage representation
         """
         # TODO: To be implemented by the student
-        # Using ominus for the inverse conversion logic
-        NxB = self.GetRobotPose(self.xk)  # Robot pose (storage representation)
-        # Storage_representation = v.ominus(NxB)
         return v
 
     def J_s2o(self, v):
@@ -83,9 +76,6 @@ class MapFeature:
         :return: Jacobian of the conversion function from the storage representation to the observation representation
         """
         # TODO: To be implemented by the student
-        # Using J_1boxplus for the Jacobian calculation
-        NxB = self.Pose()  # Robot pose (storage representation)
-        # print(v)
         return np.eye(v.shape[0])
     
     def J_o2s(self, v):
@@ -98,8 +88,6 @@ class MapFeature:
         :return: Jacobian of the conversion function from the observation representation to the storage representation
         """
         # TODO: To be implemented by the student
-        # Using J_ominus for the Jacobian calculation
-        NxB = self.Pose()  # Robot pose (storage representation)
         return np.eye(v.shape[0])
 
     def hf(self, xk):  # Observation function for al zf observations
@@ -134,13 +122,7 @@ class MapFeature:
         :return: vector of expected features observations corresponding to the vector of observed features :math:`z_f`.
         """
         # TODO: To be implemented by the student
-        # _hf = []
-        # H =self.DataAssociation(xk, self.Pk_bar, self.zf, self.Rf)
 
-        # for Fj in range(len(H)):
-        #     hfj = self.hfj(xk, Fj)  # Compute each feature's observation
-        #     _hf.append(hfj)
-        # return np.vstack(_hf)
         h = []
         for i in range(len(self.Hp)):
             Fj = self.Hp[i]

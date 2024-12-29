@@ -75,7 +75,7 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         self.xy_max_range = 50  # maximum XY range, used to simulate the field of view
         self.fxy = np.diag(np.array([0.1**2,0.1**2]))  # covariance of simulated range noise
 
-        self.yaw_reading_frequency = 100 # frequency of Yasw readings
+        self.yaw_reading_frequency = 1 # frequency of Yasw readings
         self.v_yaw_std = np.deg2rad(5)  # std deviation of simulated heading noise
 
     def fs(self, xsk_1, usk):  # input velocity motion model with velocity noise
@@ -210,8 +210,6 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
             return np.zeros((0, 0)), np.zeros((0, 0))
 
 
-
-
     def ReadCartesianFeature(self):
         """ Simulates the Cartesian feature measurements from a range sensor.
         
@@ -227,7 +225,7 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
             # Provide readings at the predefined frequency
             return [], np.zeros((0, 0))
 
-        detected_features = []
+        zf = []
         Rf = []
         # Loop through all features in the map
         for feature_position in self.M:
@@ -237,16 +235,15 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
             # Check if feature is within sensor range
             if distance_to_feature <= self.xy_max_range:
                 # Generate measurement noise
-                # measurement_noise = np.random.multivariate_normal(
-                #     np.zeros(2), self.fxy)           
+                measurement_noise = np.random.normal(0, np.sqrt(self.fxy.diagonal())).reshape((len(self.fxy), 1))
                 
                 # Transform feature to robot frame
                 robot_transform = Pose3D(self.xsk[:3]).ominus()
-                feature_in_robot_frame = feature_position.boxplus(robot_transform)
+                feature_in_robot_frame = feature_position.boxplus(robot_transform) + measurement_noise
                 # Add to detected features list
-                detected_features.append(feature_in_robot_frame)
+                zf.append(feature_in_robot_frame)
                 Rf.append(self.fxy)
-        return detected_features, Rf
+        return zf, Rf
 
     def PlotRobot(self):
         """ Updates the plot of the robot at the current pose """

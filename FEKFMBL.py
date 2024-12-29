@@ -228,6 +228,7 @@ class FEKFMBL(GFLocalization, MapFeature):
             self.xk, self.Pk = self.xk_bar, self.Pk_bar
 
         self.PlotUncertainty(zf, Rf)
+        self.Log(self.robot.xsk, self.xk, self.Pk, self.xk_bar, zk)
 
         return self.xk, self.Pk, self.xk_bar, zf, Rk 
 
